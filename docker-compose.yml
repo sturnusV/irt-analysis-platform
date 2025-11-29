@@ -1,0 +1,109 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - irt-network
+
+  r-service:
+    build:
+      context: ./r_service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./r_scripts:/app/r_scripts
+      - shared_data:/app/shared_data
+    environment:
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - irt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - shared_data:/app/shared_data
+    environment:
+      - BUILD_DATE=${BUILD_DATE}
+      - COMMIT_HASH=${COMMIT_HASH}
+      - REDIS_URL=redis://redis:6379
+      - R_SERVICE_URL=http://r-service:8001
+      - FRONTEND_URL=http://localhost:3000
+      - ENVIRONMENT=development
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - irt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+      - shared_data:/app/shared_data
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - R_SERVICE_URL=http://r-service:8001
+      - ENVIRONMENT=development
+    command: celery -A app.celery worker --loglevel=info
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - irt-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+      - VITE_ENVIRONMENT=development
+    networks:
+      - irt-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+  shared_data:
+
+networks:
+  irt-network:
+    driver: bridge

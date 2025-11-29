@@ -1,0 +1,14 @@
+[build]
+builder = "NIXPACKS"
+
+[build.args]
+BUILD_DATE = "dynamic"
+COMMIT_HASH = "dynamic"
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"
+
+[variables]
+ENVIRONMENT = "production"
+REDIS_URL = "${REDIS_URL}"
