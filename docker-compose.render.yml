@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.render.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+      - frontend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_URL=redis://irt-redis:6379
+      - R_SERVICE_URL=http://irt-r-service:8001
+      - FRONTEND_URL=https://irt-platform.onrender.com
+    volumes:
+      - shared_data:/app/shared_data
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    environment:
+      - VITE_API_URL=/api
+      - VITE_ENVIRONMENT=production
+    volumes:
+      - shared_data:/app/shared_data
+
+volumes:
+  shared_data:
