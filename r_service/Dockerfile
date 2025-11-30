@@ -2,7 +2,7 @@ FROM rocker/r-ver:4.3.2
 
 WORKDIR /app
 
-# Install system dependencies for mirt
+# Install system dependencies for mirt AND health check tools
 RUN apt-get update && apt-get install -y \
     build-essential \
     g++ \
@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     libsodium-dev \
     libunwind-dev \
+    curl \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Install R packages
@@ -27,8 +29,8 @@ COPY . .
 
 EXPOSE 8001
 
-# Simple health check that actually works
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Health check - use curl which is now installed
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
   CMD curl -f http://localhost:8001/health || exit 1
 
 CMD ["R", "-e", "pr <- plumber::plumb('plumber.R'); pr$run(host='0.0.0.0', port=8001)"]

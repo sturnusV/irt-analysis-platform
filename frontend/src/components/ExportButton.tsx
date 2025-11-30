@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Button, Menu, MenuItem, Box } from '@mui/material';
 import { Download, PictureAsPdf, TableChart } from '@mui/icons-material';
+import { API_CONFIG } from '../config/api';
 
 interface ExportButtonProps {
   sessionId: string;
@@ -17,13 +18,16 @@ const ExportButton: React.FC<ExportButtonProps> = ({ sessionId }) => {
     setAnchorEl(null);
   };
 
+  // Remove /api from base URL for export endpoints
+  const baseUrlWithoutApi = API_CONFIG.BASE_URL.replace('/api', '');
+
   const exportCSV = () => {
-    window.open(`http://localhost:8000/api/export/csv/${sessionId}`, '_blank');
+    window.open(`${baseUrlWithoutApi}/api/export/csv/${sessionId}`, '_blank');
     handleClose();
   };
 
   const exportPDF = () => {
-    window.open(`http://localhost:8000/api/export/pdf/${sessionId}`, '_blank');
+    window.open(`${baseUrlWithoutApi}/api/export/pdf/${sessionId}`, '_blank');
     handleClose();
   };
 
