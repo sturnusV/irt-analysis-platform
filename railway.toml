@@ -1,57 +1,13 @@
 [build]
 builder = "DOCKERFILE"
+dockerfilePath = "./Dockerfile.railway"
 
 [deploy]
-numReplicas = 1
+healthcheckPath = "/health"
 restartPolicyType = "ON_FAILURE"
-healthCheckPath = "/health"
-healthCheckTimeout = 300
 
-# Backend service
-[[services]]
-name = "backend"
-sourcePath = "./backend"
-dockerfilePath = "./Dockerfile.prod"
-healthCheckPath = "/health"
-healthCheckTimeout = 300
-
-[services.env]
+[variables]
 ENVIRONMENT = "production"
-REDIS_URL = "${REDIS_URL}"
+REDIS_URL = "redis://redis:6379"
 R_SERVICE_URL = "http://r-service:8001"
-FRONTEND_URL = "https://${RAILWAY_STATIC_URL}"
-
-# Frontend service  
-[[services]]
-name = "frontend"
-sourcePath = "./frontend"
-dockerfilePath = "./Dockerfile.prod"
-healthCheckPath = "/"
-healthCheckTimeout = 300
-
-[services.env]
-VITE_API_URL = "/api"
-VITE_ENVIRONMENT = "production"
-
-# R service
-[[services]]
-name = "r-service"
-sourcePath = "./r_service"
-dockerfilePath = "./Dockerfile"
-healthCheckPath = "/health"
-healthCheckTimeout = 300
-
-[services.env]
-REDIS_URL = "${REDIS_URL}"
-
-# Celery worker
-[[services]]
-name = "celery-worker"
-sourcePath = "./backend"
-dockerfilePath = "./Dockerfile.prod"
-command = "celery -A app.celery worker --loglevel=info"
-
-[services.env]
-REDIS_URL = "${REDIS_URL}"
-R_SERVICE_URL = "http://r-service:8001"
-ENVIRONMENT = "production"
+FRONTEND_URL = "https://your-app-name.railway.app"
