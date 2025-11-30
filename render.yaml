@@ -2,8 +2,8 @@ services:
   - type: web
     name: irt-backend
     env: docker
-    docker:
-      dockerfile: ./backend/Dockerfile.prod
+    dockerContext: ./backend
+    dockerCommand: docker build -f Dockerfile.prod -t irt-backend . && docker run irt-backend
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -24,8 +24,8 @@ services:
   - type: web
     name: irt-frontend
     env: docker
-    docker:
-      dockerfile: ./frontend/Dockerfile.prod
+    dockerContext: ./frontend
+    dockerCommand: docker build -f Dockerfile.prod -t irt-frontend . && docker run irt-frontend
     envVars:
       - key: VITE_API_URL
         value: /api
@@ -42,8 +42,8 @@ services:
   - type: web
     name: irt-r-service
     env: docker
-    docker:
-      dockerfile: ./r_service/Dockerfile
+    dockerContext: ./r_service
+    dockerCommand: docker build -t irt-r-service . && docker run irt-r-service
     envVars:
       - key: REDIS_URL
         fromService:
@@ -58,9 +58,8 @@ services:
   - type: worker
     name: irt-celery-worker
     env: docker
-    docker:
-      dockerfile: ./backend/Dockerfile.prod
-    command: celery -A app.celery worker --loglevel=info
+    dockerContext: ./backend
+    dockerCommand: docker build -f Dockerfile.prod -t irt-celery . && docker run irt-celery celery -A app.celery worker --loglevel=info
     envVars:
       - key: REDIS_URL
         fromService:
@@ -78,4 +77,4 @@ services:
 
   - type: redis
     name: irt-redis
-    ipAllowList: []
+    ipAllowList: [] # Only allow internal connections
