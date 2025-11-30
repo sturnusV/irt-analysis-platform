@@ -1,0 +1,81 @@
+services:
+  - type: web
+    name: irt-backend
+    env: docker
+    docker:
+      dockerfile: ./backend/Dockerfile.prod
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: irt-redis
+          property: connectionString
+      - key: R_SERVICE_URL
+        value: http://irt-r-service:8001
+      - key: FRONTEND_URL
+        value: https://irt-frontend.onrender.com
+    disk:
+      name: shared_data
+      mountPath: /app/shared_data
+      sizeGB: 1
+
+  - type: web
+    name: irt-frontend
+    env: docker
+    docker:
+      dockerfile: ./frontend/Dockerfile.prod
+    envVars:
+      - key: VITE_API_URL
+        value: /api
+      - key: VITE_ENVIRONMENT
+        value: production
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: http://irt-backend:8000/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
+    name: irt-r-service
+    env: docker
+    docker:
+      dockerfile: ./r_service/Dockerfile
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: irt-redis
+          property: connectionString
+    disk:
+      name: shared_data
+      mountPath: /app/shared_data
+      sizeGB: 1
+
+  - type: worker
+    name: irt-celery-worker
+    env: docker
+    docker:
+      dockerfile: ./backend/Dockerfile.prod
+    command: celery -A app.celery worker --loglevel=info
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: irt-redis
+          property: connectionString
+      - key: R_SERVICE_URL
+        value: http://irt-r-service:8001
+      - key: ENVIRONMENT
+        value: production
+    disk:
+      name: shared_data
+      mountPath: /app/shared_data
+      sizeGB: 1
+
+  - type: redis
+    name: irt-redis
+    ipAllowList: []
