@@ -1,7 +1,0 @@
-FROM alpine:latest
-
-RUN apk add --no-cache docker-compose curl
-
-COPY . .
-
-CMD ["sh", "-c", "docker-compose -f docker-compose.yml up"]
