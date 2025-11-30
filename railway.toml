@@ -11,6 +11,7 @@ healthCheckTimeout = 300
 [[services]]
 name = "backend"
 sourcePath = "./backend"
+dockerfilePath = "./Dockerfile.prod"
 healthCheckPath = "/health"
 healthCheckTimeout = 300
 
@@ -24,6 +25,7 @@ FRONTEND_URL = "https://${RAILWAY_STATIC_URL}"
 [[services]]
 name = "frontend"
 sourcePath = "./frontend"
+dockerfilePath = "./Dockerfile.prod"
 healthCheckPath = "/"
 healthCheckTimeout = 300
 
@@ -35,6 +37,7 @@ VITE_ENVIRONMENT = "production"
 [[services]]
 name = "r-service"
 sourcePath = "./r_service"
+dockerfilePath = "./Dockerfile"
 healthCheckPath = "/health"
 healthCheckTimeout = 300
 
@@ -45,6 +48,7 @@ REDIS_URL = "${REDIS_URL}"
 [[services]]
 name = "celery-worker"
 sourcePath = "./backend"
+dockerfilePath = "./Dockerfile.prod"
 command = "celery -A app.celery worker --loglevel=info"
 
 [services.env]
