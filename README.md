@@ -79,7 +79,6 @@ IRT AnalyzeR utilizes a robust, scalable microservices architecture.
 
 ### Deployment Ready
 * **Docker Compose** for local development.
-* **Railway-ready** configuration.
 * **Cloud storage compatible** for result persistence (if configured).
 * **Scalable architecture** leveraging task queues and microservices.
 

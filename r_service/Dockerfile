@@ -29,7 +29,7 @@ COPY . .
 
 EXPOSE 8001
 
-# Health check - use curl which is now installed
+# Health check - use curl
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
   CMD curl -f http://localhost:8001/health || exit 1
 

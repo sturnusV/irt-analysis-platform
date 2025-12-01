@@ -1,4 +1,4 @@
-FROM node:18-alpine as builder
+﻿FROM node:18-alpine as builder
 
 WORKDIR /app
 
@@ -14,15 +14,19 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Production stage
-FROM nginx:alpine
+# Production stage - use Node.js to serve the built files
+FROM node:18-alpine
 
-# Copy built app
-COPY --from=builder /app/dist /usr/share/nginx/html
+WORKDIR /app
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Install serve to serve static files
+RUN npm install -g serve
 
-EXPOSE 80
+# Copy built app from builder stage
+COPY --from=builder /app/dist ./dist
 
-CMD ["nginx", "-g", "daemon off;"]
+# Expose port 3000 for the frontend
+EXPOSE 3000
+
+# Serve the built files on port 3000
+CMD ["serve", "-s", "dist", "-l", "3000"]
