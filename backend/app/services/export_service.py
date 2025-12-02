@@ -12,6 +12,7 @@ import logging
 import numpy as np
 from typing import Dict, List, Any
 from app.version import get_version_info
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -19,29 +20,69 @@ class ExportService:
     def __init__(self):
         pass
     
-    def _safe_format_value(self, value, format_spec=".3f", default="N/A"):
-        """Safely format values that might be nested lists, None, or other types"""
+    def _format_timestamp(self, timestamp_str: str) -> str:
+        """Convert ISO timestamp to human readable format"""
+        try:
+            # Handle different timestamp formats
+            if 'T' in timestamp_str:
+                dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            else:
+                # Try parsing as string
+                dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+            
+            # Format as: "December 02, 2025 08:31 AM"
+            return dt.strftime('%B %d, %Y %I:%M %p')
+        except Exception:
+            # If parsing fails, return original
+            return timestamp_str
+    
+    def _format_analysis_type(self, analysis_type) -> str:
+        """Remove brackets and quotes from analysis type"""
+        if isinstance(analysis_type, list):
+            if len(analysis_type) > 0:
+                # Remove brackets and quotes
+                return str(analysis_type[0]).replace("'", "").replace("[", "").replace("]", "")
+            return "3PL"
+        elif isinstance(analysis_type, str):
+            # Clean string format
+            return analysis_type.replace("'", "").replace("[", "").replace("]", "")
+        return "3PL"
+    
+    def _safe_format_value(self, value, format_spec=".3f", default="N/A", remove_trailing_zeros=True):
+        """Safely format values, handling special cases"""
         if value is None:
             return default
         
-        # Handle deeply nested list values - extract the actual value
+        # Handle deeply nested list values
         if isinstance(value, list):
-            # Recursively extract until we get a non-list value
             while isinstance(value, list) and len(value) > 0:
                 value = value[0]
-            
-            # If we ended up with an empty list, return default
             if isinstance(value, list) and len(value) == 0:
                 return default
         
-        # Handle numeric formatting
         try:
             if isinstance(value, (int, float)):
+                # Special handling for integers that should have no decimals
+                if isinstance(value, int):
+                    return str(value)
+                
+                # For floats, check if it's actually an integer
+                if value.is_integer():
+                    return str(int(value))
+                
+                # Apply formatting
                 if format_spec:
-                    return format(value, format_spec)
+                    formatted = format(value, format_spec)
+                    
+                    # Remove trailing zeros
+                    if remove_trailing_zeros:
+                        # Remove trailing zeros and trailing decimal point if all zeros after decimal
+                        if '.' in formatted:
+                            formatted = formatted.rstrip('0').rstrip('.')
+                    
+                    return formatted
                 return str(value)
             else:
-                # For strings and other types, just return as string
                 return str(value)
         except (ValueError, TypeError):
             return str(value)
@@ -57,16 +98,19 @@ class ExportService:
         """Extract and properly format model information from nested structures"""
         model_info = analysis_results.get('model_info', {})
         
-        # Use the already cleaned model_info from analysis_tasks.py
-        # Don't re-format with decimals for boolean and integer values
+        # Clean model type
         model_type = model_info.get('type', 'N/A')
+        if isinstance(model_type, list):
+            model_type = self._format_analysis_type(model_type)
+        elif model_type != 'N/A':
+            model_type = str(model_type).replace("'", "").replace("[", "").replace("]", "")
+        
         converged = model_info.get('converged', 'N/A')
         iterations = model_info.get('iterations', 'N/A')
         log_likelihood = model_info.get('log_likelihood', 'N/A')
         
-        # Format based on actual data types
         return {
-            'type': str(model_type) if model_type != 'N/A' else 'N/A',
+            'type': model_type,
             'converged': str(converged) if converged != 'N/A' else 'N/A',
             'iterations': str(int(iterations)) if iterations != 'N/A' and isinstance(iterations, (int, float)) else 'N/A',
             'log_likelihood': self._safe_format_value(log_likelihood, '.2f', 'N/A')
@@ -76,11 +120,16 @@ class ExportService:
         """Extract and properly format data summary from nested structures"""
         data_summary = analysis_results.get('data_summary', {})
         
+        # Format counts as integers (no decimals)
+        n_students = data_summary.get('n_students')
+        n_items = data_summary.get('n_items')
+        original_students = data_summary.get('original_students')
+        
         return {
-            'n_students': self._safe_format_value(data_summary.get('n_students')),
-            'n_items': self._safe_format_value(data_summary.get('n_items')),
+            'n_students': self._safe_format_value(n_students, None, 'N/A'),
+            'n_items': self._safe_format_value(n_items, None, 'N/A'),
             'response_rate': self._safe_format_value(data_summary.get('response_rate'), '.3f'),
-            'original_students': self._safe_format_value(data_summary.get('original_students'))
+            'original_students': self._safe_format_value(original_students, None, 'N/A')
         }
     
     def export_to_csv(self, analysis_results: dict) -> Response:
@@ -92,12 +141,20 @@ class ExportService:
             model_info = self._extract_model_info(analysis_results)
             data_summary = self._extract_data_summary(analysis_results)
             
+            # Format timestamp
+            formatted_date = self._format_timestamp(analysis_results['created_at'])
+            
+            # Format analysis type
+            formatted_analysis_type = self._format_analysis_type(
+                analysis_results.get('analysis_type', '3PL_IRT')
+            )
+            
             # Write header information
             output.write("COMPREHENSIVE IRT ANALYSIS REPORT\n")
             output.write("=" * 50 + "\n")
             output.write(f"Session ID: {analysis_results['session_id']}\n")
-            output.write(f"Analysis Date: {analysis_results['created_at']}\n")
-            output.write(f"Analysis Type: {analysis_results.get('analysis_type', '3PL_IRT')}\n")
+            output.write(f"Analysis Date: {formatted_date}\n")
+            output.write(f"Analysis Type: {formatted_analysis_type}\n")
             
             # Data Summary
             output.write(f"Students: {data_summary['n_students']}\n")
@@ -117,12 +174,10 @@ class ExportService:
             fit_data = [
                 ['M2', self._safe_format_value(model_fit.get('m2'), '.3f')],
                 ['M2 p-value', self._safe_format_value(model_fit.get('m2_p'), '.3f')],
-                ['M2 Degrees of Freedom', self._safe_format_value(model_fit.get('m2_df'))],
+                ['M2 Degrees of Freedom', self._safe_format_value(model_fit.get('m2_df'), None)],
                 ['TLI', self._safe_format_value(model_fit.get('tli'), '.3f')],
                 ['RMSEA', self._safe_format_value(model_fit.get('rmsea'), '.3f')],
                 ['Reliability', self._safe_format_value(model_fit.get('reliability'), '.3f')],
-                ['AIC', self._safe_format_value(model_fit.get('aic'), '.1f')],
-                ['BIC', self._safe_format_value(model_fit.get('bic'), '.1f')],
                 ['Log-Likelihood', self._safe_format_value(model_fit.get('log_likelihood'), '.1f')]
             ]
             for stat, value in fit_data:
@@ -146,7 +201,6 @@ class ExportService:
                 theta_values = test_info['theta']
                 info_values = test_info['information']
                 
-                # Ensure both are lists and have same length
                 if isinstance(theta_values, list) and isinstance(info_values, list):
                     for theta, info in zip(theta_values, info_values):
                         output.write(f"{self._safe_format_value(theta, '.4f')},{self._safe_format_value(info, '.6f')}\n")
@@ -184,17 +238,18 @@ class ExportService:
             
             story = []
             
-             # Add version info to PDF
+            # Add version info to PDF
             version_info = get_version_info()
-            version_text = f"""
-            <b>v:</b> {version_info['version']}<br/>
-            """
-            version_para = Paragraph(version_text, styles['Normal'])
-            story.append(version_para)
             
             # Extract properly formatted data
             model_info = self._extract_model_info(analysis_results)
             data_summary = self._extract_data_summary(analysis_results)
+            
+            # Format timestamp and analysis type
+            formatted_date = self._format_timestamp(analysis_results['created_at'])
+            formatted_analysis_type = self._format_analysis_type(
+                analysis_results.get('analysis_type', '3PL_IRT')
+            )
             
             # Title Page
             title = Paragraph("COMPREHENSIVE IRT ANALYSIS REPORT", styles['Title'])
@@ -204,9 +259,9 @@ class ExportService:
             # Session Information
             session_info = f"""
             <b>Session ID:</b> {analysis_results['session_id']}<br/>
-            <b>Analysis Date:</b> {analysis_results['created_at']}<br/>
-            <b>Analysis Type:</b> {analysis_results.get('analysis_type', '3PL_IRT')}<br/>
-            <b>Software:</b> IRT Analysis Platform 1.0
+            <b>Analysis Date:</b> {formatted_date}<br/>
+            <b>Analysis Type:</b> {formatted_analysis_type}<br/>
+            <b>Software:</b> IRT Analysis Platform {version_info['version']}
             """
             info_para = Paragraph(session_info, styles['Normal'])
             story.append(info_para)
@@ -249,12 +304,10 @@ class ExportService:
                 ['Statistic', 'Value', 'Interpretation'],
                 ['M2', self._safe_format_value(model_fit.get('m2'), '.3f'), 'Overall fit (lower better)'],
                 ['M2 p-value', self._safe_format_value(model_fit.get('m2_p'), '.3f'), 'p > 0.05 indicates good fit'],
-                ['M2 DF', self._safe_format_value(model_fit.get('m2_df')), 'Degrees of freedom'],
+                ['M2 DF', self._safe_format_value(model_fit.get('m2_df'), None), 'Degrees of freedom'],
                 ['TLI', self._safe_format_value(model_fit.get('tli'), '.3f'), '> 0.90 good, > 0.95 excellent'],
                 ['RMSEA', self._safe_format_value(model_fit.get('rmsea'), '.3f'), '< 0.08 acceptable, < 0.05 good'],
                 ['Reliability', self._safe_format_value(model_fit.get('reliability'), '.3f'), 'Test reliability'],
-                ['AIC', self._safe_format_value(model_fit.get('aic'), '.1f'), 'Model comparison'],
-                ['BIC', self._safe_format_value(model_fit.get('bic'), '.1f'), 'Model comparison'],
                 ['Log-Likelihood', self._safe_format_value(model_fit.get('log_likelihood'), '.1f'), 'Model fit']
             ]
             
@@ -324,7 +377,6 @@ class ExportService:
                 theta_values = test_info['theta']
                 info_values = test_info['information']
                 
-                # Convert to numpy arrays if they are lists
                 if isinstance(theta_values, list) and isinstance(info_values, list):
                     info_array = np.array(info_values)
                     theta_array = np.array(theta_values)
@@ -373,17 +425,23 @@ class ExportService:
     def export_to_json(self, analysis_results: dict) -> Response:
         """Export complete analysis results to JSON"""
         try:
+            # Format data for JSON export
+            formatted_date = self._format_timestamp(analysis_results['created_at'])
+            formatted_analysis_type = self._format_analysis_type(
+                analysis_results.get('analysis_type', '3PL_IRT')
+            )
+            
             # Create a comprehensive export structure
             export_data = {
                 "metadata": {
                     "export_version": "1.0",
-                    "export_timestamp": analysis_results['created_at'],
+                    "export_timestamp": formatted_date,
                     "software": "IRT Analysis Platform"
                 },
                 "session_info": {
                     "session_id": analysis_results['session_id'],
-                    "analysis_type": analysis_results.get('analysis_type', '3PL_IRT'),
-                    "created_at": analysis_results['created_at']
+                    "analysis_type": formatted_analysis_type,
+                    "created_at": formatted_date
                 },
                 "data_summary": self._extract_data_summary(analysis_results),
                 "model_info": self._extract_model_info(analysis_results),

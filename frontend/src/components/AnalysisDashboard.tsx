@@ -519,8 +519,6 @@ const AnalysisDashboard: React.FC = () => {
                       <Typography><strong>M2 p-value:</strong> {results.model_fit?.m2_p || 'N/A'}</Typography>
                       <Typography><strong>Reliability:</strong> {results.model_fit?.reliability || 'N/A'}</Typography>
                       <Typography><strong>Log-Likelihood:</strong> {results.model_fit?.log_likelihood || 'N/A'}</Typography>
-                      <Typography><strong>AIC:</strong> {results.model_fit?.aic || 'N/A'}</Typography>
-                      <Typography><strong>BIC:</strong> {results.model_fit?.bic || 'N/A'}</Typography>
                     </Box>
                   </CardContent>
                 </Card>

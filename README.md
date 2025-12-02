@@ -1,4 +1,4 @@
-# 🌟 IRT AnalyzeR: The Modern IRT Analysis Platform
+# IRT AnalyzeR: The Modern IRT Analysis Platform
 
 A modern, web-based platform for **Item Response Theory (IRT)** analysis with real-time visualization and comprehensive professional reporting.
 
@@ -121,10 +121,10 @@ The platform requires data in a standard dichotomous format.
 
 ### Example CSV
 ```csv
-student_id,item1,item2,item3,item4
-student001,1,0,1,1
-student002,0,1,1,0
-student003,1,1,0,1
+item1,item2,item3,item4
+1,0,1,1
+0,1,1,0
+1,1,0,1
 ```
 
 ## Configuration
@@ -155,7 +155,7 @@ This table outlines the core microservices running within the Dockerized environ
 
 **IRT AnalyzeR** is designed for ephemeral processing, prioritizing user privacy.
 
-### Automatic Cleanup ⏰
+### Automatic Cleanup
 * Analysis results **expire after 1 hour**.
 * All data is automatically purged from Redis after expiration.
 * **No long-term storage** of user data.

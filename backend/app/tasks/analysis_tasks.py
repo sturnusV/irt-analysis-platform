@@ -5,6 +5,7 @@ from app.services.r_service import r_service
 import pandas as pd
 import os
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +109,76 @@ def process_uploaded_file(self, file_path: str, session_id: str):
         update_analysis_status(session_id, "error", error_msg)
         raise
 
+def clean_string_value(value, default=""):
+    """Clean string values by removing brackets, quotes, and unwanted characters"""
+    if value is None:
+        return default
+    
+    # Handle lists
+    if isinstance(value, list):
+        if len(value) > 0:
+            value = value[0]
+        else:
+            return default
+    
+    # Convert to string and clean
+    result = str(value)
+    
+    # Remove unwanted characters
+    result = result.replace("'", "").replace('"', '')
+    result = result.replace("[", "").replace("]", "")
+    result = result.strip()
+    
+    return result
+
+def format_timestamp_for_storage():
+    """Create ISO timestamp for storage (keeps original format for storage)"""
+    return datetime.now().isoformat()
+
+def safe_float(value, default=0.0, format_decimal=False):
+    """Safely convert value to float, handling various edge cases"""
+    if value is None:
+        return default
+    
+    try:
+        # Handle lists
+        if isinstance(value, (list, tuple)):
+            if len(value) > 0:
+                value = value[0]
+            else:
+                return default
+        
+        # Convert to float
+        result = float(value)
+        
+        # Remove trailing .0 if it's actually an integer
+        if result.is_integer() and format_decimal:
+            return int(result)
+        
+        return result
+    except (ValueError, TypeError):
+        return default
+
+def safe_int(value, default=0):
+    """Safely convert value to integer"""
+    if value is None:
+        return default
+    
+    try:
+        # Handle lists
+        if isinstance(value, (list, tuple)):
+            if len(value) > 0:
+                value = value[0]
+            else:
+                return default
+        
+        # Try to convert to int
+        return int(float(value))
+    except (ValueError, TypeError):
+        return default
+
 def transform_r_results(r_results: dict, session_id: str, file_path: str) -> dict:
-    """Transform R service results to match Python schema"""
+    """Transform R service results to match Python schema with clean formatting"""
     
     # Transform item parameters to match expected schema
     item_params = []
@@ -123,7 +192,7 @@ def transform_r_results(r_results: dict, session_id: str, file_path: str) -> dic
             'se_guessing': safe_float(item.get('se_guessing'), 0.0),
             'discrimination': safe_float(item.get('discrimination'), 1.0),
             'se_discrimination': safe_float(item.get('se_discrimination'), 0.0),
-            'model_type': item.get('model_type', '3PL')  # Add model_type from item if available
+            'model_type': clean_string_value(item.get('model_type', '3PL'))
         }
         item_params.append(param_dict)
     
@@ -134,36 +203,19 @@ def transform_r_results(r_results: dict, session_id: str, file_path: str) -> dic
     model_fit_raw = r_results.get('model_fit', {})
     model_fit_clean = {}
     
-    # Helper function to safely extract numbers from nested structures
-    def extract_number(value, default=0.0):
-        if value is None:
-            return default
-        if isinstance(value, list):
-            if len(value) > 0:
-                # Handle nested lists: [[value]] -> value
-                nested_value = value[0]
-                if isinstance(nested_value, list) and len(nested_value) > 0:
-                    return safe_float(nested_value[0], default)
-                return safe_float(nested_value, default)
-            return default
-        return safe_float(value, default)
-    
     # Convert model fit values to proper types
-    model_fit_clean['m2'] = extract_number(model_fit_raw.get('m2'))
-    model_fit_clean['m2_p'] = extract_number(model_fit_raw.get('m2_p'))
-    model_fit_clean['tli'] = extract_number(model_fit_raw.get('tli'))
-    model_fit_clean['rmsea'] = extract_number(model_fit_raw.get('rmsea'))
-    model_fit_clean['reliability'] = extract_number(model_fit_raw.get('reliability'))
-    model_fit_clean['log_likelihood'] = extract_number(model_fit_raw.get('log_likelihood'))
-    model_fit_clean['aic'] = extract_number(model_fit_raw.get('aic'))
-    model_fit_clean['bic'] = extract_number(model_fit_raw.get('bic'))
+    model_fit_clean['m2'] = safe_float(model_fit_raw.get('m2'), 0.0)
+    model_fit_clean['m2_p'] = safe_float(model_fit_raw.get('m2_p'), 0.0)
+    model_fit_clean['tli'] = safe_float(model_fit_raw.get('tli'), 0.0)
+    model_fit_clean['rmsea'] = safe_float(model_fit_raw.get('rmsea'), 0.0)
+    model_fit_clean['reliability'] = safe_float(model_fit_raw.get('reliability'), 0.0)
+    model_fit_clean['log_likelihood'] = safe_float(model_fit_raw.get('log_likelihood'), 0.0)
+    model_fit_clean['aic'] = safe_float(model_fit_raw.get('aic'), 0.0)
+    model_fit_clean['bic'] = safe_float(model_fit_raw.get('bic'), 0.0)
     
-    # Handle integer fields
+    # Handle M2 DF as integer (no decimals)
     m2_df = model_fit_raw.get('m2_df')
-    if isinstance(m2_df, list) and len(m2_df) > 0:
-        model_fit_clean['m2_df'] = int(m2_df[0])
-    else:
-        model_fit_clean['m2_df'] = int(m2_df) if m2_df is not None else 0
+    model_fit_clean['m2_df'] = safe_int(m2_df, 0)
     
     model_fit_clean['converged'] = bool(model_fit_raw.get('converged', True))
     
@@ -191,51 +243,37 @@ def transform_r_results(r_results: dict, session_id: str, file_path: str) -> dic
     model_info_raw = r_results.get('model_info', {})
     model_info_clean = {}
     
-    # Helper function to extract model info values with proper typing
-    def extract_model_info(value, value_type='auto', default=None):
-        if value is None:
-            return default
-        if isinstance(value, list):
-            if len(value) > 0:
-                value = value[0]  # Return first element of list
-            else:
-                return default
-        
-        # Handle different value types
-        if value_type == 'bool':
-            return bool(value)
-        elif value_type == 'int':
-            try:
-                return int(value)
-            except (ValueError, TypeError):
-                return default
-        elif value_type == 'float':
-            try:
-                return float(value)
-            except (ValueError, TypeError):
-                return default
-        else:  # auto - try to detect type
-            if isinstance(value, (int, float)):
-                return value
-            elif isinstance(value, bool):
-                return value
-            else:
-                return str(value)
-    
     # Extract model info with proper typing
-    model_info_clean['type'] = extract_model_info(model_info_raw.get('type'), 'auto', '3PL')
-    model_info_clean['converged'] = extract_model_info(model_info_raw.get('converged'), 'bool', True)
-    model_info_clean['iterations'] = extract_model_info(model_info_raw.get('iterations'), 'int', 0)
-    model_info_clean['log_likelihood'] = extract_model_info(model_info_raw.get('log_likelihood'), 'float', 0.0)
+    model_type = model_info_raw.get('type', '3PL')
+    model_info_clean['type'] = clean_string_value(model_type)
     
-    # Extract data summary
+    # Handle converged (might come as string "TRUE"/"FALSE" from R)
+    converged_val = model_info_raw.get('converged', True)
+    if isinstance(converged_val, str):
+        converged_val = converged_val.lower() in ['true', 't', '1', 'yes', 'y']
+    model_info_clean['converged'] = bool(converged_val)
+    
+    # Iterations should be integer
+    iterations_val = model_info_raw.get('iterations', 0)
+    model_info_clean['iterations'] = safe_int(iterations_val, 0)
+    
+    # Log-likelihood as float
+    log_likelihood_val = model_info_raw.get('log_likelihood', 0.0)
+    model_info_clean['log_likelihood'] = safe_float(log_likelihood_val, 0.0)
+    
+    # Extract data summary - ensure proper integer formatting
     data_summary_raw = r_results.get('data_summary', {})
     data_summary_clean = {}
     
-    data_summary_clean['n_students'] = extract_model_info(data_summary_raw.get('n_students'), 'int')
-    data_summary_clean['n_items'] = extract_model_info(data_summary_raw.get('n_items'), 'int')
-    data_summary_clean['original_students'] = extract_model_info(data_summary_raw.get('original_students'), 'int')
-    data_summary_clean['response_rate'] = extract_model_info(data_summary_raw.get('response_rate'), 'float')
+    # All these should be integers without decimal points
+    data_summary_clean['n_students'] = safe_int(data_summary_raw.get('n_students'), 0)
+    data_summary_clean['n_items'] = safe_int(data_summary_raw.get('n_items'), 0)
+    data_summary_clean['original_students'] = safe_int(data_summary_raw.get('original_students'), 0)
+    data_summary_clean['response_rate'] = safe_float(data_summary_raw.get('response_rate'), 0.0)
+    
+    # Clean analysis type
+    analysis_type_raw = r_results.get('analysis_type', '3PL_IRT')
+    clean_analysis_type = clean_string_value(analysis_type_raw)
     
     return {
         'session_id': session_id,
@@ -249,19 +287,6 @@ def transform_r_results(r_results: dict, session_id: str, file_path: str) -> dic
         },
         'data_summary': data_summary_clean,
         'data_path': file_path,
-        'created_at': pd.Timestamp.now().isoformat(),
-        'analysis_type': r_results.get('analysis_type', '2PL_IRT')
+        'created_at': format_timestamp_for_storage(),
+        'analysis_type': clean_analysis_type
     }
-
-def safe_float(value, default=0.0):
-    """Safely convert value to float, handling various edge cases"""
-    if value is None:
-        return default
-    try:
-        if isinstance(value, (list, tuple)):
-            if len(value) > 0:
-                return float(value[0])
-            return default
-        return float(value)
-    except (ValueError, TypeError):
-        return default

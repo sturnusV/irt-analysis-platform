@@ -67,6 +67,11 @@ const twoDecimalFormatter = (value: number | string): string => {
     return Number(value).toFixed(2);
 };
 
+const yAxisTickFormatter = (value: number): string => {
+    // Format Y-axis ticks to 2 decimal places
+    return value.toFixed(2);
+};
+
 const processIIFResponse = (data: IIFResponse['iif_data']): IIFStateData => {
     if (!data) return {};
 
@@ -154,10 +159,10 @@ const IIFChart: React.FC<IIFChartProps> = ({ sessionId, itemParameters, selected
         );
     }
 
-    // Fix: Handle null case for allIifData
+    // Handle null case for allIifData
     const availableItemIds = allIifData ? Object.keys(allIifData) : [];
 
-    // Fix: Check if allIifData is null OR empty
+    // Check if allIifData is null OR empty
     if (!allIifData || availableItemIds.length === 0) {
         return (
             <Box sx={{ textAlign: "center", p: 2 }}>
@@ -201,6 +206,7 @@ const IIFChart: React.FC<IIFChartProps> = ({ sessionId, itemParameters, selected
                             <YAxis
                                 domain={[0, maxIIF * 1.05]}
                                 label={{ value: "Information", angle: -90, position: "insideLeft" }}
+                                tickFormatter={yAxisTickFormatter}
                             />
                             <Tooltip
                                 formatter={(val: number) => [twoDecimalFormatter(val), "Information"]}
