@@ -20,12 +20,26 @@ Try the platform with sample data:
 1. Use the built-in sample data button to run the analysis.
 2. See real-time IRT analysis in action!
 
+## Application Screenshots
+
+| Upload Interface | Dashboard Interface |
+|---------------------|-------------|
+| ![Upload](screenshots/upload.png) | ![Dashboard Interface](screenshots/dashboard.png) |
+
+| Parameter Tables | PDF Report |
+|---------------------|-------------|
+| ![Parameter Tables](screenshots/parameter-tables.png) | ![PDF Report](screenshots/pdf-report.png) |
+
+| System Architecture |
+|-------------------|
+| ![System Architecture](screenshots/system-architecture.png) |
+
 ## Key Features
 
 ### Core Analysis
 * **3PL IRT Modeling** with automatic fallback to **2PL** when insufficient data for guessing parameter ($c$) estimation is present.
 * **Real-time parameter estimation** with standard errors (SEs).
-* **Comprehensive Model Fit Statistics** ($M_2$, TLI, RMSEA, AIC, BIC).
+* **Comprehensive Model Fit Statistics** ($M_2$, TLI, RMSEA).
 * **Automated data validation** and cleaning.
 
 ### Interactive Visualizations
